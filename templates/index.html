@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChatArchive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0e11;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --accent: #c8f060;
+    --accent2: #7eb3ff;
+    --text: #f0efe8;
+    --muted: #7a7a8a;
+    --muted2: #4a4a5a;
+    --serif: 'Instrument Serif', Georgia, serif;
+    --sans: 'DM Sans', sans-serif;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.6; }
+
+  #app { height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── UPLOAD SCREEN ── */
+  #upload-screen {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 2rem; animation: fadeIn 0.6s ease;
+  }
+  .upload-logo {
+    font-family: var(--serif); font-size: 3rem; font-style: italic;
+    color: var(--text); letter-spacing: -0.02em; margin-bottom: 0.25rem;
+  }
+  .upload-logo span { color: var(--accent); }
+  .upload-tagline { color: var(--muted); font-size: 0.9rem; margin-bottom: 3rem; letter-spacing: 0.04em; }
+
+  .drop-zone {
+    width: 100%; max-width: 480px;
+    border: 1.5px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--accent); background: rgba(200,240,96,0.04); }
+  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-icon {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: rgba(200,240,96,0.1); border: 1px solid rgba(200,240,96,0.2);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1rem; font-size: 1.4rem;
+  }
+  .drop-title { font-family: var(--serif); font-size: 1.3rem; font-style: italic; margin-bottom: 0.4rem; }
+  .drop-sub { color: var(--muted); font-size: 0.82rem; }
+  .drop-types { margin-top: 1.2rem; display: flex; gap: 8px; justify-content: center; }
+  .drop-types span {
+    font-size: 0.75rem; padding: 3px 10px; border-radius: 20px;
+    background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+  }
+
+  .upload-hint {
+    margin-top: 2rem; max-width: 480px; width: 100%;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 1rem 1.25rem;
+  }
+  .upload-hint h4 { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.6rem; }
+  .upload-hint ol { padding-left: 1.2rem; color: var(--muted); font-size: 0.82rem; }
+  .upload-hint ol li { margin-bottom: 3px; }
+  .upload-hint ol li span { color: var(--text); }
+
+  #upload-error {
+    margin-top: 1rem; color: #ff6b6b; font-size: 0.82rem; display: none;
+  }
+
+  /* ── MAIN SCREEN ── */
+  #main-screen { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .topbar-logo { font-family: var(--serif); font-size: 1.3rem; font-style: italic; }
+  .topbar-logo span { color: var(--accent); }
+  .topbar-sep { width: 1px; height: 20px; background: var(--border2); }
+  .topbar-info { color: var(--muted); font-size: 0.82rem; }
+  .topbar-info strong { color: var(--text); }
+
+  .tabs {
+    display: flex; gap: 2px; margin-left: auto;
+    background: var(--surface2); border-radius: var(--radius-sm); padding: 3px;
+  }
+  .tab-btn {
+    padding: 5px 14px; border-radius: 6px; border: none;
+    background: transparent; color: var(--muted); font-family: var(--sans); font-size: 0.82rem;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .tab-btn.active { background: var(--bg); color: var(--text); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  .reset-btn {
+    padding: 5px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border2);
+    background: transparent; color: var(--muted); font-family: var(--sans); font-size: 0.82rem;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .reset-btn:hover { color: var(--text); border-color: var(--muted); }
+
+  .panel { display: none; flex: 1; overflow: hidden; }
+  .panel.active { display: flex; }
+
+  /* ── CHAT PANEL ── */
+  #panel-chat { flex-direction: column; }
+
+  .chat-toolbar {
+    display: flex; gap: 10px; padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+    background: var(--bg);
+  }
+  .search-wrap { flex: 1; position: relative; }
+  .search-wrap input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); padding: 7px 12px 7px 34px;
+    color: var(--text); font-family: var(--sans); font-size: 0.85rem;
+    outline: none; transition: border-color 0.2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap::before {
+    content: '⌕'; position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%); color: var(--muted); font-size: 1rem; pointer-events: none;
+  }
+  .filter-select {
+    background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius-sm);
+    color: var(--text); font-family: var(--sans); font-size: 0.85rem;
+    padding: 7px 12px; outline: none; cursor: pointer; min-width: 140px;
+  }
+
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 1.5rem;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-track { background: transparent; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--muted2); border-radius: 2px; }
+
+  .msg-group { margin-bottom: 0.75rem; }
+  .msg-sender-label {
+    font-size: 0.72rem; font-weight: 500; letter-spacing: 0.04em;
+    margin-bottom: 3px; padding-left: 12px;
+  }
+  .msg-bubble {
+    display: inline-block; max-width: 72%;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 0 12px 12px 12px;
+    padding: 8px 12px; font-size: 0.875rem; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg-bubble.is-media { color: var(--muted); font-style: italic; }
+  .msg-time { font-size: 0.7rem; color: var(--muted2); margin-top: 2px; padding-left: 12px; }
+
+  .msg-group.self { text-align: right; }
+  .msg-group.self .msg-sender-label { padding-left: 0; padding-right: 12px; }
+  .msg-group.self .msg-bubble { border-radius: 12px 0 12px 12px; background: rgba(200,240,96,0.08); border-color: rgba(200,240,96,0.18); }
+  .msg-group.self .msg-time { padding-left: 0; padding-right: 12px; }
+
+  .sender-colors { }
+
+  .pagination {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    padding: 0.75rem; border-top: 1px solid var(--border); flex-shrink: 0;
+    background: var(--bg);
+  }
+  .page-btn {
+    padding: 5px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border2);
+    background: transparent; color: var(--muted); font-family: var(--sans); font-size: 0.82rem;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .page-btn:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .page-info { color: var(--muted); font-size: 0.82rem; min-width: 100px; text-align: center; }
+
+  /* ── STATS PANEL ── */
+  #panel-stats {
+    flex-direction: column; overflow-y: auto; padding: 1.5rem; gap: 1.25rem;
+  }
+  #panel-stats::-webkit-scrollbar { width: 4px; }
+  #panel-stats::-webkit-scrollbar-thumb { background: var(--muted2); border-radius: 2px; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.25rem;
+  }
+  .stat-label { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+  .stat-val { font-family: var(--serif); font-size: 2rem; font-style: italic; color: var(--accent); }
+  .stat-sub { font-size: 0.75rem; color: var(--muted); margin-top: 3px; }
+
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem;
+  }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 1rem; }
+  .chart-wrap { position: relative; height: 180px; }
+  .chart-wrap.tall { height: 220px; }
+
+  .sender-list { display: flex; flex-direction: column; gap: 8px; }
+  .sender-row { display: flex; align-items: center; gap: 10px; }
+  .sender-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .sender-name { flex: 1; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sender-count { font-size: 0.82rem; color: var(--muted); }
+  .sender-bar-wrap { flex: 1; height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .sender-bar { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+
+  /* ── ACTIVITY PANEL ── */
+  #panel-activity {
+    flex-direction: column; overflow-y: auto; padding: 1.5rem; gap: 1.25rem;
+  }
+  #panel-activity::-webkit-scrollbar { width: 4px; }
+  #panel-activity::-webkit-scrollbar-thumb { background: var(--muted2); border-radius: 2px; }
+
+  .heatmap-section { }
+  .heatmap-title { font-family: var(--serif); font-size: 1.1rem; font-style: italic; margin-bottom: 1rem; }
+  .heatmap-grid {
+    display: grid; gap: 3px;
+    grid-template-columns: repeat(auto-fill, minmax(12px, 1fr));
+  }
+  .heatmap-cell {
+    aspect-ratio: 1; border-radius: 3px;
+    background: var(--surface2); transition: transform 0.1s;
+    cursor: default; position: relative;
+  }
+  .heatmap-cell:hover { transform: scale(1.3); z-index: 1; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(14,14,17,0.85);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 1rem; z-index: 100;
+  }
+  .loading-overlay.active { display: flex; }
+  .spinner {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 2px solid var(--border2); border-top-color: var(--accent);
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { color: var(--muted); font-size: 0.85rem; }
+
+  @media (max-width: 600px) {
+    .chart-row { grid-template-columns: 1fr; }
+    .topbar { flex-wrap: wrap; gap: 0.5rem; }
+    .tabs { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="upload-screen">
+    <div class="upload-logo">Chat<span>Archive</span></div>
+    <p class="upload-tagline">Your conversations, beautifully explored</p>
+
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept=".zip,.txt,.json">
+      <div class="drop-icon">📂</div>
+      <p class="drop-title">Drop your export here</p>
+      <p class="drop-sub">or click to browse files</p>
+      <div class="drop-types">
+        <span>.zip</span><span>.txt</span><span>.json</span>
+      </div>
+    </div>
+
+    <div class="upload-hint">
+      <h4>How to export</h4>
+      <ol>
+        <li><span>WhatsApp:</span> Open chat → ⋮ → More → Export Chat → Without Media</li>
+        <li><span>Telegram:</span> Desktop app → Settings → Export Telegram Data → JSON</li>
+      </ol>
+    </div>
+
+    <p id="upload-error"></p>
+  </div>
+
+  <div id="main-screen">
+    <div class="topbar">
+      <span class="topbar-logo">Chat<span>Archive</span></span>
+      <div class="topbar-sep"></div>
+      <span class="topbar-info" id="topbar-info">—</span>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="chat">Messages</button>
+        <button class="tab-btn" data-tab="stats">Stats</button>
+        <button class="tab-btn" data-tab="activity">Activity</button>
+      </div>
+      <button class="reset-btn" id="reset-btn">← New</button>
+    </div>
+
+    <div id="panel-chat" class="panel active">
+      <div class="chat-toolbar">
+        <div class="search-wrap">
+          <input type="text" id="search-input" placeholder="Search messages…">
+        </div>
+        <select id="sender-filter" class="filter-select">
+          <option value="">All people</option>
+        </select>
+      </div>
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="pagination">
+        <button class="page-btn" id="prev-btn">← Prev</button>
+        <span class="page-info" id="page-info">Page 1</span>
+        <button class="page-btn" id="next-btn">Next →</button>
+      </div>
+    </div>
+
+    <div id="panel-stats" class="panel">
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="chart-row">
+        <div class="chart-card">
+          <p class="chart-title">Messages by person</p>
+          <div class="sender-list" id="sender-list"></div>
+        </div>
+        <div class="chart-card">
+          <p class="chart-title">By time of day</p>
+          <div class="chart-wrap"><canvas id="chart-hour"></canvas></div>
+        </div>
+        <div class="chart-card full">
+          <p class="chart-title">Messages over time</p>
+          <div class="chart-wrap tall"><canvas id="chart-month"></canvas></div>
+        </div>
+        <div class="chart-card full">
+          <p class="chart-title">By day of week</p>
+          <div class="chart-wrap"><canvas id="chart-weekday"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-activity" class="panel">
+      <div class="chart-card">
+        <p class="heatmap-title">Message heatmap</p>
+        <p class="chart-title">Each cell = one day</p>
+        <div class="heatmap-grid" id="heatmap"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <p class="loading-text">Parsing your chat…</p>
+  </div>
+</div>
+
+<script>
+const SENDER_COLORS = ['#c8f060','#7eb3ff','#ff8fa3','#ffd97d','#a8e6cf','#ffaaa5','#b4a7d6','#87ceeb','#f4a460','#98fb98'];
+
+let sessionId = null;
+let currentPage = 1;
+let totalPages = 1;
+let searchDebounce = null;
+let statsData = null;
+let senderColorMap = {};
+
+const $ = id => document.getElementById(id);
+
+function showLoading(v) { $('loading').classList.toggle('active', v); }
+
+$('drop-zone').addEventListener('dragover', e => { e.preventDefault(); $('drop-zone').classList.add('drag'); });
+$('drop-zone').addEventListener('dragleave', () => $('drop-zone').classList.remove('drag'));
+$('drop-zone').addEventListener('drop', e => {
+  e.preventDefault(); $('drop-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+});
+$('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) uploadFile(e.target.files[0]);
+});
+
+async function uploadFile(file) {
+  showLoading(true);
+  $('upload-error').style.display = 'none';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    sessionId = data.session_id;
+    statsData = data.stats;
+    initUI(data);
+  } catch(e) {
+    $('upload-error').textContent = e.message;
+    $('upload-error').style.display = 'block';
+  }
+  showLoading(false);
+}
+
+function initUI(data) {
+  $('upload-screen').style.display = 'none';
+  $('main-screen').style.display = 'flex';
+  const senders = data.senders;
+  senders.forEach((s, i) => senderColorMap[s] = SENDER_COLORS[i % SENDER_COLORS.length]);
+  $('topbar-info').innerHTML = `<strong>${data.total.toLocaleString()}</strong> messages · <strong>${senders.length}</strong> people`;
+  const sel = $('sender-filter');
+  sel.innerHTML = '<option value="">All people</option>';
+  senders.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    sel.appendChild(opt);
+  });
+  loadMessages(1);
+  renderStats(data.stats, senders);
+  renderHeatmap(data.stats.by_date);
+}
+
+async function loadMessages(page) {
+  if (!sessionId) return;
+  showLoading(true);
+  const search = $('search-input').value;
+  const sender = $('sender-filter').value;
+  const params = new URLSearchParams({ session_id: sessionId, page, per_page: 50 });
+  if (search) params.set('search', search);
+  if (sender) params.set('sender', sender);
+  const res = await fetch('/api/messages?' + params);
+  const data = await res.json();
+  showLoading(false);
+  currentPage = data.page;
+  totalPages = data.pages;
+  renderMessages(data.messages);
+  $('page-info').textContent = `Page ${currentPage} of ${totalPages || 1}`;
+  $('prev-btn').disabled = currentPage <= 1;
+  $('next-btn').disabled = currentPage >= totalPages;
+}
+
+function renderMessages(messages) {
+  const container = $('chat-messages');
+  container.innerHTML = '';
+  if (!messages.length) {
+    container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:2rem">No messages found</p>';
+    return;
+  }
+  const senders = Object.keys(senderColorMap);
+  const selfSender = senders[0];
+  let lastSender = null;
+  messages.forEach(m => {
+    const isSelf = m.sender === selfSender;
+    const group = document.createElement('div');
+    group.className = 'msg-group' + (isSelf ? ' self' : '');
+    const color = senderColorMap[m.sender] || '#888';
+    if (m.sender !== lastSender) {
+      const lbl = document.createElement('div');
+      lbl.className = 'msg-sender-label';
+      lbl.style.color = color;
+      lbl.textContent = m.sender;
+      group.appendChild(lbl);
+      lastSender = m.sender;
+    }
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble' + (m.is_media ? ' is-media' : '');
+    bubble.textContent = m.is_media ? '📎 Media' : m.body;
+    group.appendChild(bubble);
+    if (m.timestamp) {
+      const t = document.createElement('div');
+      t.className = 'msg-time';
+      t.textContent = new Date(m.timestamp).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      group.appendChild(t);
+    }
+    container.appendChild(group);
+  });
+  container.scrollTop = 0;
+}
+
+$('prev-btn').addEventListener('click', () => loadMessages(currentPage - 1));
+$('next-btn').addEventListener('click', () => loadMessages(currentPage + 1));
+$('search-input').addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => loadMessages(1), 400);
+});
+$('sender-filter').addEventListener('change', () => loadMessages(1));
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+$('reset-btn').addEventListener('click', () => {
+  sessionId = null; statsData = null; senderColorMap = {};
+  $('main-screen').style.display = 'none';
+  $('upload-screen').style.display = 'flex';
+  $('file-input').value = '';
+  destroyCharts();
+});
+
+let charts = {};
+function destroyCharts() {
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+}
+
+function renderStats(stats, senders) {
+  const grid = $('stats-grid');
+  const topSender = senders[0] || '—';
+  const topCount = stats.senders[topSender] || 0;
+  const days = Object.keys(stats.by_date).length;
+  const avg = days ? Math.round(stats.total / days) : 0;
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total messages</div><div class="stat-val">${stats.total.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="stat-label">Media shared</div><div class="stat-val">${stats.media_count.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="stat-label">Days active</div><div class="stat-val">${days}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg / day</div><div class="stat-val">${avg}</div></div>
+  `;
+  const sl = $('sender-list');
+  sl.innerHTML = '';
+  const maxCount = Math.max(...Object.values(stats.senders));
+  senders.forEach((s, i) => {
+    const count = stats.senders[s];
+    const color = SENDER_COLORS[i % SENDER_COLORS.length];
+    const pct = Math.round((count / stats.total) * 100);
+    sl.innerHTML += `
+      <div class="sender-row">
+        <div class="sender-dot" style="background:${color}"></div>
+        <div class="sender-name">${s}</div>
+        <div class="sender-bar-wrap"><div class="sender-bar" style="width:${pct}%;background:${color}"></div></div>
+        <div class="sender-count">${count.toLocaleString()}</div>
+      </div>`;
+  });
+  destroyCharts();
+  const chartDefaults = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#7a7a8a', font: { size: 11 } } },
+      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#7a7a8a', font: { size: 11 } } },
+    }
+  };
+
+  const hourLabels = Array.from({length:24}, (_,i) => i + 'h');
+  const hourData = hourLabels.map((_,i) => stats.by_hour[String(i)] || 0);
+  charts.hour = new Chart($('chart-hour'), {
+    type: 'bar',
+    data: { labels: hourLabels, datasets: [{ data: hourData, backgroundColor: 'rgba(200,240,96,0.35)', borderColor: '#c8f060', borderWidth: 1, borderRadius: 3 }] },
+    options: { ...chartDefaults }
+  });
+
+  const monthKeys = Object.keys(stats.by_month);
+  const monthVals = monthKeys.map(k => stats.by_month[k]);
+  charts.month = new Chart($('chart-month'), {
+    type: 'line',
+    data: { labels: monthKeys, datasets: [{ data: monthVals, borderColor: '#7eb3ff', backgroundColor: 'rgba(126,179,255,0.1)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#7eb3ff' }] },
+    options: { ...chartDefaults }
+  });
+
+  const wdKeys = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const wdShort = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const wdVals = wdKeys.map(k => stats.by_weekday[k] || 0);
+  charts.weekday = new Chart($('chart-weekday'), {
+    type: 'bar',
+    data: { labels: wdShort, datasets: [{ data: wdVals, backgroundColor: 'rgba(255,143,163,0.35)', borderColor: '#ff8fa3', borderWidth: 1, borderRadius: 4 }] },
+    options: { ...chartDefaults }
+  });
+}
+
+function renderHeatmap(byDate) {
+  const container = $('heatmap');
+  container.innerHTML = '';
+  if (!byDate || !Object.keys(byDate).length) return;
+  const dates = Object.keys(byDate).sort();
+  const start = new Date(dates[0]);
+  const end = new Date(dates[dates.length - 1]);
+  const max = Math.max(...Object.values(byDate));
+  const cur = new Date(start);
+  while (cur <= end) {
+    const key = cur.toISOString().split('T')[0];
+    const count = byDate[key] || 0;
+    const cell = document.createElement('div');
+    cell.className = 'heatmap-cell';
+    const intensity = count / max;
+    if (intensity > 0) {
+      const alpha = 0.15 + intensity * 0.85;
+      cell.style.background = `rgba(200,240,96,${alpha.toFixed(2)})`;
+    }
+    cell.title = `${key}: ${count} messages`;
+    container.appendChild(cell);
+    cur.setDate(cur.getDate() + 1);
+  }
+}
+</script>
+</body>
+</html>
