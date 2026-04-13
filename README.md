@@ -2,6 +2,8 @@
 
 Browse your WhatsApp and Telegram chats beautifully — search messages, filter by person, visualize activity over time.
 
+<img width="1919" height="939" alt="Screenshot 2026-04-13 201439" src="https://github.com/user-attachments/assets/a863d4c4-b744-4a43-9e84-5cf9f8834a1d" />
+
 ## Setup
 
 ```bash
